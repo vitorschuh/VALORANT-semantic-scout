@@ -1,0 +1,61 @@
+id: silver.vlr_maps
+version: 1.0.0
+owner: data-eng
+description: One row per played map (Summit only, VALORANT Champions 2026), parsed from bronze.vlr_matches.
+schema:
+  - name: game_id
+    type: string
+    required: true
+    unique: true
+  - name: match_id
+    type: string
+    required: true
+  - name: stage
+    type: string
+    required: true
+  - name: played_at_raw
+    type: string
+    required: true
+  - name: map_order
+    type: integer
+    required: true
+    min: 1
+    max: 5
+  - name: map_name
+    type: string
+    required: true
+    allowed: [Summit]
+  - name: team1_name
+    type: string
+    required: true
+  - name: team2_name
+    type: string
+    required: true
+  - name: team1_score
+    type: integer
+    required: true
+    min: 0
+  - name: team2_score
+    type: integer
+    required: true
+    min: 0
+  - name: duration_s
+    type: integer
+    min: 600
+    max: 10800
+  - name: team1_agents
+    type: list
+    required: true
+  - name: team2_agents
+    type: list
+    required: true
+  - name: n_rounds
+    type: integer
+    required: true
+    min: 13
+    max: 60
+  - name: ingested_at
+    type: timestamp
+    required: true
+quality:
+  min_rows: 10

@@ -1,0 +1,16 @@
+# Pinned to the versions resolved on Astro Runtime 3.3-11 (Python 3.14), 2026-11-01.
+# To bump: change a pin, `astro dev pytest`, then run the smoke test before committing.
+# airflow-ai-sdk (@task.llm/@task.embed) removed 2026-11-02: 0.1.8 (latest) is registered as an Airflow provider and
+# imports the deprecated airflow.decorators.base shim -> circular import that crashes every Airflow process on 3.3.
+# Not used until phase 4; revisit then (newer release, or call pydantic-ai/openai directly).
+openai==3.42.0
+pyiceberg[s3fs,pyarrow]==0.12.0
+s3fs==2026.6.0
+pyarrow==26.0.0
+duckdb==2.0.0
+pgvector==0.5.1
+psycopg[binary]==3.3.6
+pydantic==2.13.4
+pyyaml==6.0.3
+requests==2.34.2
+beautifulsoup4==4.15.0
