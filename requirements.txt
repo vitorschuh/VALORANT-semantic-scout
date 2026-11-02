@@ -1,8 +1,7 @@
-# Pinned to the versions resolved on Astro Runtime 3.3-11 (Python 3.14), 2026-11-01.
+# Pinned to the versions resolved on Astro Runtime 3.3-11 (Python 3.14).
 # To bump: change a pin, `astro dev pytest`, then run the smoke test before committing.
-# airflow-ai-sdk (@task.llm/@task.embed) removed 2026-11-02: 0.1.8 (latest) is registered as an Airflow provider and
-# imports the deprecated airflow.decorators.base shim -> circular import that crashes every Airflow process on 3.3.
-# Not used until phase 4; revisit then (newer release, or call pydantic-ai/openai directly).
+# airflow-ai-sdk is intentionally not installed: 0.1.8 registers as an Airflow provider and hits a circular
+# import on Airflow 3.3 (airflow.decorators.base shim), crashing every Airflow process. Revisit in phase 4.
 openai==3.42.0
 pyiceberg[s3fs,pyarrow]==0.12.0
 s3fs==2026.6.0
