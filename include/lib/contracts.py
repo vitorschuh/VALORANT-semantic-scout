@@ -58,11 +58,12 @@ def validate(table: pa.Table, contract_path: str | Path) -> None:
             unexpected = set(pc.unique(values.drop_null()).to_pylist()) - set(col["allowed"])
             if unexpected:
                 errors.append(f"{name}: values not in allowed set: {sorted(unexpected)}")
-        col_min, col_max = pc.min(values).as_py(), pc.max(values).as_py()
-        if "min" in col and col_min is not None and col_min < col["min"]:
-            errors.append(f"{name}: below min {col['min']}")
-        if "max" in col and col_max is not None and col_max > col["max"]:
-            errors.append(f"{name}: above max {col['max']}")
+        if "min" in col or "max" in col:
+            col_min, col_max = pc.min(values).as_py(), pc.max(values).as_py()
+            if "min" in col and col_min is not None and col_min < col["min"]:
+                errors.append(f"{name}: below min {col['min']}")
+            if "max" in col and col_max is not None and col_max > col["max"]:
+                errors.append(f"{name}: above max {col['max']}")
 
     min_rows = contract.get("quality", {}).get("min_rows", 0)
     if table.num_rows < min_rows:
