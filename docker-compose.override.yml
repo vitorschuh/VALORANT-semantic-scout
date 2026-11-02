@@ -1,0 +1,51 @@
+# Extra services next to the Astro Airflow stack. Picked up automatically by `astro dev start`.
+services:
+  serving-db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: valorant
+      POSTGRES_PASSWORD: valorant
+      POSTGRES_DB: serving
+      EMBEDDING_DIM: ${EMBEDDING_DIM:-1536}
+    ports: ["5433:5432"]
+    volumes:
+      - serving-db:/var/lib/postgresql/data
+      - ./include/sql/init_pgvector.sh:/docker-entrypoint-initdb.d/init.sh:ro
+      - ./include/sql/init_pgvector.sql:/sql/init_pgvector.sql:ro
+
+  # MinIO stopped publishing official images (minio/minio, minio/mc) in late 2025.
+  # Chainguard builds of the same binaries, pinned by digest for reproducibility.
+  minio:
+    image: cgr.dev/chainguard/minio@sha256:0a01100085e30fb08d2f39e39c9f5c9d83a95707f220b007d813b690cd41622d
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio12345
+    ports: ["9000:9000", "9001:9001"]
+    volumes: [minio:/data]
+
+  # No shell in this image: mc retries via restart policy until MinIO is up.
+  minio-init:
+    image: cgr.dev/chainguard/minio-client@sha256:3b67177c0e12f44f646a5cf21b20fc5a79dd2d7a6b4db632b436f0b9e2e46717
+    depends_on: [minio]
+    environment:
+      MC_HOST_local: http://minio:minio12345@minio:9000
+    command: ["mb", "--ignore-existing", "local/warehouse"]
+    restart: on-failure
+
+  iceberg-rest:
+    image: apache/iceberg-rest-fixture
+    depends_on: [minio-init]
+    environment:
+      CATALOG_WAREHOUSE: s3://warehouse/
+      CATALOG_IO__IMPL: org.apache.iceberg.aws.s3.S3FileIO
+      CATALOG_S3_ENDPOINT: http://minio:9000
+      CATALOG_S3_PATH__STYLE__ACCESS: "true"
+      AWS_ACCESS_KEY_ID: minio
+      AWS_SECRET_ACCESS_KEY: minio12345
+      AWS_REGION: us-east-1
+    ports: ["8181:8181"]
+
+volumes:
+  serving-db:
+  minio:
