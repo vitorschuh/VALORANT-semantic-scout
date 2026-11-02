@@ -1,6 +1,9 @@
 # Extra services next to the Astro Airflow stack. Picked up automatically by `astro dev start`.
+# Astro puts the Airflow services on the `airflow` network; the extra services must join it
+# or hostnames like iceberg-rest / serving-db don't resolve from the Airflow containers.
 services:
   serving-db:
+    networks: [airflow]
     image: pgvector/pgvector:pg16
     environment:
       POSTGRES_USER: valorant
@@ -16,6 +19,7 @@ services:
   # MinIO stopped publishing official images (minio/minio, minio/mc) in late 2025.
   # Chainguard builds of the same binaries, pinned by digest for reproducibility.
   minio:
+    networks: [airflow]
     image: cgr.dev/chainguard/minio@sha256:0a01100085e30fb08d2f39e39c9f5c9d83a95707f220b007d813b690cd41622d
     command: ["server", "/data", "--console-address", ":9001"]
     environment:
@@ -26,6 +30,7 @@ services:
 
   # No shell in this image: mc retries via restart policy until MinIO is up.
   minio-init:
+    networks: [airflow]
     image: cgr.dev/chainguard/minio-client@sha256:3b67177c0e12f44f646a5cf21b20fc5a79dd2d7a6b4db632b436f0b9e2e46717
     depends_on: [minio]
     environment:
@@ -34,6 +39,7 @@ services:
     restart: on-failure
 
   iceberg-rest:
+    networks: [airflow]
     image: apache/iceberg-rest-fixture
     depends_on: [minio-init]
     environment:
