@@ -1,0 +1,66 @@
+id: silver.vlr_rounds
+version: 1.0.0
+owner: data-eng
+description: One row per round (Summit only, VALORANT Champions 2026), parsed from bronze.vlr_matches. Grain for the round descriptions/embeddings in phase 4.
+schema:
+  - name: round_id
+    type: string
+    required: true
+    unique: true
+  - name: match_id
+    type: string
+    required: true
+  - name: game_id
+    type: string
+    required: true
+  - name: map_name
+    type: string
+    required: true
+    allowed: [Summit]
+  - name: round_no
+    type: integer
+    required: true
+    min: 1
+    max: 60
+  - name: half
+    type: string
+    required: true
+    allowed: [first, second, overtime]
+  - name: team1_name
+    type: string
+    required: true
+  - name: team2_name
+    type: string
+    required: true
+  - name: team1_side
+    type: string
+    required: true
+    allowed: [ct, t]
+  - name: team2_side
+    type: string
+    required: true
+    allowed: [ct, t]
+  - name: winner_name
+    type: string
+    required: true
+  - name: winning_side
+    type: string
+    required: true
+    allowed: [ct, t]
+  - name: win_type
+    type: string
+    required: true
+    allowed: [elim, boom, defuse, time]
+  - name: team1_score_after
+    type: integer
+    required: true
+    min: 0
+  - name: team2_score_after
+    type: integer
+    required: true
+    min: 0
+  - name: ingested_at
+    type: timestamp
+    required: true
+quality:
+  min_rows: 200
