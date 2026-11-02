@@ -1,0 +1,22 @@
+id: silver.agents
+version: 1.1.0
+owner: data-eng
+description: Playable Valorant agents, flattened and typed from the raw bronze.agents payload.
+schema:
+  - name: agent_uuid
+    type: string
+    required: true
+    unique: true
+  - name: name
+    type: string
+    required: true
+    unique: true
+  - name: role
+    type: string
+    required: true
+    allowed: [Duelist, Initiator, Controller, Sentinel]
+  - name: ingested_at
+    type: timestamp
+    required: true
+quality:
+  min_rows: 20
