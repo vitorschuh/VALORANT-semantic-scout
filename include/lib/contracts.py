@@ -15,6 +15,7 @@ TYPE_CHECKS = {
     "boolean": pa.types.is_boolean,
     "timestamp": pa.types.is_timestamp,
     "date": pa.types.is_date,
+    "list": pa.types.is_list,
 }
 
 
