@@ -1,6 +1,6 @@
 # Extra services next to the Astro Airflow stack. Picked up automatically by `astro dev start`.
 # Astro puts the Airflow services on the `airflow` network; the extra services must join it
-# or hostnames like iceberg-rest / serving-db don't resolve from the Airflow containers.
+# or hostnames like kafka / minio / serving-db do not resolve from the Airflow containers.
 services:
   serving-db:
     networks: [airflow]
@@ -35,22 +35,8 @@ services:
     depends_on: [minio]
     environment:
       MC_HOST_local: http://minio:minio12345@minio:9000
-    command: ["mb", "--ignore-existing", "local/warehouse", "local/lake"]
+    command: ["mb", "--ignore-existing", "local/lake"]
     restart: on-failure
-
-  iceberg-rest:
-    networks: [airflow]
-    image: apache/iceberg-rest-fixture
-    depends_on: [minio-init]
-    environment:
-      CATALOG_WAREHOUSE: s3://warehouse/
-      CATALOG_IO__IMPL: org.apache.iceberg.aws.s3.S3FileIO
-      CATALOG_S3_ENDPOINT: http://minio:9000
-      CATALOG_S3_PATH__STYLE__ACCESS: "true"
-      AWS_ACCESS_KEY_ID: minio
-      AWS_SECRET_ACCESS_KEY: minio12345
-      AWS_REGION: us-east-1
-    ports: ["8181:8181"]
 
   # Single-node Kafka in KRaft mode (no ZooKeeper). PLAINTEXT on :9092 is for containers on the Airflow
   # network; :9094 is advertised as localhost for tools on the host. Pinned by digest.
