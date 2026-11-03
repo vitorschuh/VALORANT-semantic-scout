@@ -35,7 +35,7 @@ services:
     depends_on: [minio]
     environment:
       MC_HOST_local: http://minio:minio12345@minio:9000
-    command: ["mb", "--ignore-existing", "local/warehouse"]
+    command: ["mb", "--ignore-existing", "local/warehouse", "local/lake"]
     restart: on-failure
 
   iceberg-rest:
