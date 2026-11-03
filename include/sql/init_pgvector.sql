@@ -2,7 +2,7 @@
 -- (the dimension depends on the embedding model, still undecided — phase 4).
 CREATE EXTENSION IF NOT EXISTS vector;
 
--- Serving layer. Iceberg is the source of truth; these tables are rebuilt by the sync DAG.
+-- Serving layer. The data lake is the source of truth; these tables are rebuilt by the sync DAG.
 -- One row per (round, model): lets us re-embed with a new model and compare (drift, recall@k).
 CREATE TABLE IF NOT EXISTS round_embeddings (
     round_id    TEXT NOT NULL,

@@ -1,30 +1,20 @@
-"""Phase 2: VALORANT Champions 2026 (Shanghai) from vlr.gg: bronze (raw HTML) -> contract -> silver (maps, rounds).
+"""Phase 2: VALORANT Champions 2026 (Shanghai) from vlr.gg: raw HTML -> contract -> silver (maps, rounds).
 
-bronze.vlr_matches: one row per match page, raw HTML + lineage, append-only. Complete (all maps); scope filtering is silver's job.
-silver.vlr_maps / silver.vlr_rounds: parsed from the latest bronze copy of each match, Summit only (initial scope).
+raw/vlr_matches: one HTML object per match fetch (event_id=/match_id=/<utc timestamp>.html), complete (all maps);
+scope filtering is silver's job. Completed matches are immutable, so each is fetched once.
+silver/vlr_maps and silver/vlr_rounds: parsed from the latest raw copy of each match, Summit only (initial scope).
 """
 from datetime import datetime, timezone
 
 import pyarrow as pa
-import pyarrow.compute as pc
 from airflow.sdk import asset
 
 from include.lib import vlr
 from include.lib.contracts import contract_path, validate
-from include.lib.iceberg import append_table, get_catalog, overwrite_table
+from include.lib.lake import Lake, get_lake
 
 EVENT_ID = 2766  # VALORANT Champions 2026, Shanghai
 SCOPE_MAP = "Summit"
-
-BRONZE_SCHEMA = pa.schema(
-    [
-        ("match_id", pa.string()),
-        ("event_id", pa.int64()),
-        ("source_url", pa.string()),
-        ("html", pa.string()),
-        ("ingested_at", pa.timestamp("us", tz="UTC")),
-    ]
-)
 
 MAPS_SCHEMA = pa.schema(
     [
@@ -68,53 +58,60 @@ ROUNDS_SCHEMA = pa.schema(
 )
 
 
-def _ingested_match_ids() -> set[str]:
-    try:
-        return set(get_catalog().load_table("bronze.vlr_matches").scan(selected_fields=("match_id",)).to_arrow()["match_id"].to_pylist())
-    except Exception as exc:  # table not created yet
-        if type(exc).__name__ == "NoSuchTableError":
-            return set()
-        raise
+DATASET = "vlr_matches"
+TIMESTAMP_FORMAT = "%Y%m%dT%H%M%SZ"
+
+
+def raw_key(match_id: str, ingested_at: datetime) -> str:
+    return f"event_id={EVENT_ID}/match_id={match_id}/{ingested_at.strftime(TIMESTAMP_FORMAT)}.html"
+
+
+def parse_raw_key(key: str) -> tuple[str, datetime]:
+    """(match_id, ingested_at) encoded in a raw object key."""
+    _, match_part, file_name = key.split("/")
+    ingested_at = datetime.strptime(file_name.removesuffix(".html"), TIMESTAMP_FORMAT).replace(tzinfo=timezone.utc)
+    return match_part.removeprefix("match_id="), ingested_at
+
+
+def latest_keys(keys: list[str]) -> dict[str, str]:
+    """Raw objects are append-only; pick the most recent copy of each match."""
+    latest: dict[str, tuple[datetime, str]] = {}
+    for key in keys:
+        match_id, ingested_at = parse_raw_key(key)
+        if match_id not in latest or ingested_at > latest[match_id][0]:
+            latest[match_id] = (ingested_at, key)
+    return {match_id: key for match_id, (_, key) in latest.items()}
+
+
+def load_raw(lake: Lake) -> list[dict]:
+    """Latest raw copy of every match as {"match_id", "html", "ingested_at"}."""
+    rows = []
+    for match_id, key in latest_keys(lake.keys("raw", DATASET)).items():
+        rows.append(
+            {
+                "match_id": match_id,
+                "html": lake.get("raw", DATASET, key).decode(),
+                "ingested_at": parse_raw_key(key)[1],
+            }
+        )
+    return rows
 
 
 @asset(schedule=None)
 def bronze_vlr_matches():
-    """Fetch match pages not yet in bronze. Completed matches are immutable, so they are fetched once."""
-    listing_path = vlr.event_matches_path(EVENT_ID)
-    match_ids = vlr.parse_event_match_ids(vlr.fetch(listing_path))
-    todo = [m for m in match_ids if m not in _ingested_match_ids()]
-    if not todo:
-        return
-    rows = []
-    for match_id in todo:
-        path = f"/{match_id}/"
-        rows.append((match_id, f"{vlr.BASE_URL}{path}", vlr.fetch(path), datetime.now(timezone.utc)))
-    table = pa.table(
-        {
-            "match_id": [r[0] for r in rows],
-            "event_id": [EVENT_ID] * len(rows),
-            "source_url": [r[1] for r in rows],
-            "html": [r[2] for r in rows],
-            "ingested_at": [r[3] for r in rows],
-        },
-        schema=BRONZE_SCHEMA,
-    )
-    append_table("bronze.vlr_matches", table)
+    """Fetch match pages not yet in the lake and store them untouched."""
+    lake = get_lake()
+    already = set(latest_keys(lake.keys("raw", DATASET)))
+    listed = vlr.parse_event_match_ids(vlr.fetch(vlr.event_matches_path(EVENT_ID)))
+    for match_id in (m for m in listed if m not in already):
+        html = vlr.fetch(f"/{match_id}/")
+        lake.put("raw", DATASET, raw_key(match_id, datetime.now(timezone.utc)), html)
 
 
-def latest_per_match(bronze: pa.Table) -> pa.Table:
-    """Bronze is append-only; keep the most recent copy of each match page."""
-    ordered = bronze.sort_by([("match_id", "ascending"), ("ingested_at", "descending")])
-    first = {}
-    for i, mid in enumerate(ordered["match_id"].to_pylist()):
-        first.setdefault(mid, i)
-    return ordered.take(sorted(first.values()))
-
-
-def parse_bronze(bronze: pa.Table) -> tuple[list[dict], list[dict]]:
-    """Parse the latest bronze copy of every match into (maps, rounds) records, Summit only."""
+def parse_bronze(rows: list[dict]) -> tuple[list[dict], list[dict]]:
+    """Parse raw match pages into (maps, rounds) records, Summit only."""
     maps, rounds = [], []
-    for row in latest_per_match(bronze).to_pylist():
+    for row in rows:
         parsed = vlr.parse_match(row["html"], row["match_id"])
         for m in parsed["maps"]:
             if m["map_name"] == SCOPE_MAP:
@@ -131,17 +128,17 @@ def _to_arrow(records: list[dict], schema: pa.Schema) -> pa.Table:
 
 @asset(schedule=[bronze_vlr_matches])
 def silver_vlr_maps():
-    bronze = get_catalog().load_table("bronze.vlr_matches").scan().to_arrow()
-    maps, _ = parse_bronze(bronze)
+    lake = get_lake()
+    maps, _ = parse_bronze(load_raw(lake))
     silver = _to_arrow(maps, MAPS_SCHEMA)
     validate(silver, contract_path("silver_vlr_maps"))
-    overwrite_table("silver.vlr_maps", silver)
+    lake.write_dataset("silver", "vlr_maps", silver)
 
 
 @asset(schedule=[bronze_vlr_matches])
 def silver_vlr_rounds():
-    bronze = get_catalog().load_table("bronze.vlr_matches").scan().to_arrow()
-    _, rounds = parse_bronze(bronze)
+    lake = get_lake()
+    _, rounds = parse_bronze(load_raw(lake))
     silver = _to_arrow(rounds, ROUNDS_SCHEMA)
     validate(silver, contract_path("silver_vlr_rounds"))
-    overwrite_table("silver.vlr_rounds", silver)
+    lake.write_dataset("silver", "vlr_rounds", silver)
