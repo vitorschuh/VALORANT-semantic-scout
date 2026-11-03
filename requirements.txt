@@ -12,4 +12,7 @@ psycopg[binary]==3.3.6
 pydantic==2.13.4
 pyyaml==6.0.3
 requests==2.34.2
+apache-airflow-providers-apache-kafka==2.1.0
+apache-airflow-providers-common-messaging==2.1.2
+confluent-kafka==2.16.1
 beautifulsoup4==4.15.0
