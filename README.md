@@ -1,9 +1,21 @@
 # VALORANT Semantic Scout
 
-Semantic scouting assistant over VALORANT match data: describe a round in natural language and get
-similar rounds back. A data engineering practice project; the infrastructure is the hard part, not the volume.
+A data and AI engineering practice project built on VALORANT esports data (vlr.gg). The match data is the
+vehicle; the goal is to learn, hands-on, how a modern pipeline behaves when things go wrong.
 
-**Scope:** VALORANT Champions 2026 (Shanghai), map Summit.
+## What this project is for
+- **Airflow 3 in practice:** assets, event-driven scheduling (`AssetWatcher` on Kafka messages), human-in-the-loop
+  operators, dynamic task mapping, pools for rate limiting, retries and backfill.
+- **Data contracts at two levels:** *in transit* (messages arriving through Kafka) and *at rest* (datasets stored in the
+  lake). A violation, such as a renamed column or a changed dtype, blocks promotion, quarantines the batch, produces a
+  notification payload and waits for a human decision. Schema evolution is deliberately left for a later step.
+- **Vectorisation in Postgres:** embeddings in pgvector (HNSW) and natural-language questions answered by routing
+  between SQL and vector search.
+
+It is not a match-analysis project: analytical depth is out of scope.
+
+**Data scope:** currently VALORANT Champions 2026 (Shanghai), map Summit, kept small while the foundations are built.
+The target is the whole VCT circuit from 2023 to 2026 (events, matches, rounds, players, teams, rosters, stats).
 
 ## Architecture
 ```
